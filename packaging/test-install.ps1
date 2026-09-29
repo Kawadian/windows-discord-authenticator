@@ -16,11 +16,15 @@ try {
         if ($manifest.runValue -ne 'restore-me-test') { throw 'Original autorun not preserved across upgrade' }
         if ((Get-LocalUser UacApproval).SID.Value -ne $manifest.accountSid) { throw 'Account mismatch' }
     }
+    $privacyFile = Join-Path $env:LOCALAPPDATA 'UacApproval\privacy.json'
+    New-Item -ItemType Directory -Force (Split-Path $privacyFile) | Out-Null
+    Set-Content -LiteralPath $privacyFile -Value '{"screenshots":false}'
     $p = Start-Process "$program\unins000.exe" -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=uninstall-test.log' -Wait -PassThru
     if ($p.ExitCode -ne 0) { Get-Content uninstall-test.log | Select-String 'Provisioning failed|Lifecycle Uninstall'; throw "Uninstall failed: $($p.ExitCode)" }
     if (Get-Service UacApprovalService -ErrorAction SilentlyContinue) { throw 'Service remained' }
     if (Get-LocalUser UacApproval -ErrorAction SilentlyContinue) { throw 'Account remained' }
     if (Test-Path $data) { throw 'Configuration remained' }
+    if (Test-Path $privacyFile) { throw 'User privacy preferences remained' }
     if ((Get-ItemProperty $runKey).UacApprovalTray -ne 'restore-me-test') { throw 'Autorun not restored' }
     foreach ($name in @('UacApprovalWatchdog', 'UacApprovalWatchdogAtStartup')) {
         if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) { throw 'Watchdog remained' }

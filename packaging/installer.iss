@@ -53,7 +53,7 @@ end;
 function Lifecycle(Script, Mode: String): Boolean;
 var Code: Integer;
 begin
-  Result := ExecAndLogOutputWithNativeSysDir(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+  Result := ExecAndLogOutput(ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + Script + '" -Mode ' + Mode,
     '', SW_HIDE, ewWaitUntilTerminated, Code, nil) and (Code = 0);
   Log('Lifecycle ' + Mode + ': exit ' + IntToStr(Code));
