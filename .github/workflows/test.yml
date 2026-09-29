@@ -20,6 +20,22 @@ jobs:
       - name: Windows import smoke test
         if: runner.os == 'Windows'
         run: python -c "import approval_agent.tray, approval_agent.service, approval_agent.runner"
+      - name: Local administrator account compatibility
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $bytes = New-Object byte[] 24
+          [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          try {
+            $secret = ConvertTo-SecureString -String ('Aa1!' + [Convert]::ToBase64String($bytes)) -AsPlainText -Force
+            $account = New-LocalUser -Name UacApprovalProbe -Password $secret -PasswordNeverExpires -Description 'UAC Approval temporary admin'
+            if (-not $account.SID) { throw 'No SID returned' }
+          } catch {
+            Write-Output $_.Exception.ToString()
+            throw
+          } finally {
+            Remove-LocalUser -Name UacApprovalProbe -ErrorAction SilentlyContinue
+          }
       - name: PowerShell script syntax
         if: runner.os == 'Windows'
         shell: pwsh
