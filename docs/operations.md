@@ -38,7 +38,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -Ref v1.2.3
 powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -SourcePath C:\path\to\checkout
 ```
 
-GitHub のコミット SHA を特定し、保護された `%ProgramFiles%\UacApproval` 内にソースを展開します。更新用と復旧用の wheel をService稼働中に用意した後、Serviceを正常停止して既存パスワードを失効させ、パッケージとソースを更新します。新Serviceが起動しなければ旧パッケージと旧ソースを復元します。旧ソースは `source.backup-日時` として保持されます。
+GitHub のコミット SHA を特定し、保護された `%ProgramFiles%\UacApproval` 内にソースを展開します。Service の実行ファイルと同じ場所の Python を使用するため、別の Python を後から追加しても導入先が変わりません。更新用と復旧用の wheel をService稼働中に用意した後、Serviceを正常停止して既存パスワードを失効させ、パッケージとソースを更新します。新Serviceが起動しなければ旧パッケージと旧ソースを復元します。旧ソースは `source.backup-日時-ID` として保持されます。
 
 `%ProgramData%\UacApproval` 内の Bot Token、PC設定、期限記録、および専用管理者アカウントは更新対象に含めません。Service再起動で発行済み一時パスワードは失効します。標準ユーザー側の Tray は再ログオンで新コードを読み込みます。依存ライブラリの変更を伴う更新が途中で失敗した場合、旧パッケージは復元されますが、全ユーザー向けPythonに追加・更新された依存ライブラリは残る場合があります。
 

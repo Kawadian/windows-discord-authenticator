@@ -52,9 +52,20 @@ if (-not (Test-Path (Join-Path $data 'config.json')) -or
     throw '既存のインストールが見つかりません。先に install.ps1 を実行してください。'
 }
 
-$python = (& py -3 -c 'import sys; print(sys.executable)').Trim()
-$pythonSite = (& py -3 -c 'import sysconfig; print(sysconfig.get_path("purelib"))').Trim()
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path $python) -or
+$serviceCommand = (Get-CimInstance Win32_Service -Filter "Name='$serviceName'").PathName
+if ($serviceCommand -match '^\s*"([^"]+\.exe)"') {
+    $hostExe = $Matches[1]
+} elseif ($serviceCommand -match '^\s*(.+?\.exe)(?:\s|$)') {
+    $hostExe = $Matches[1]
+} else {
+    throw 'Service の実行ファイルを特定できませんでした。'
+}
+$python = Join-Path (Split-Path -Parent $hostExe) 'python.exe'
+if (-not (Test-Path $python)) {
+    throw "Service と同じ場所に Python がありません: $python"
+}
+$pythonSite = (& $python -c 'import sysconfig; print(sysconfig.get_path("purelib"))').Trim()
+if ($LASTEXITCODE -ne 0 -or
     $python.StartsWith($env:USERPROFILE, [StringComparison]::OrdinalIgnoreCase) -or
     $pythonSite.StartsWith($env:USERPROFILE, [StringComparison]::OrdinalIgnoreCase)) {
     throw '全ユーザー向け Python が見つかりません。現在のインストールと同じ Python を使ってください。'
