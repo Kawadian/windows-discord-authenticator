@@ -3,6 +3,7 @@ param([ValidateSet('Prepare', 'Install', 'Uninstall', 'Resume')][string] $Mode)
 $ErrorActionPreference = 'Stop'
 trap {
     [Console]::Error.WriteLine(('Provisioning failed at line {0}: {1}' -f $_.InvocationInfo.ScriptLineNumber, $_.Exception.GetType().Name))
+    if ($env:GITHUB_ACTIONS -eq 'true') { [Console]::Error.WriteLine($_.Exception.ToString()) }
     exit 1
 }
 $program = Join-Path $env:ProgramFiles 'UacApproval'
@@ -92,7 +93,7 @@ if ($Mode -eq 'Install') {
         $bytes = New-Object byte[] 24
         $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
         try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
-        $password = ConvertTo-SecureString ('Aa1!' + [Convert]::ToBase64String($bytes)) -AsPlainText -Force
+        $password = ConvertTo-SecureString -String ('Aa1!' + [Convert]::ToBase64String($bytes)) -AsPlainText -Force
         $account = New-LocalUser -Name $accountName -Password $password -PasswordNeverExpires -Description 'UAC Approval temporary admin'
         $manifest.accountSid = $account.SID.Value
         SaveManifest

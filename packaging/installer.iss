@@ -88,9 +88,7 @@ procedure DeinitializeSetup;
 begin
   if Prepared and not Completed then begin
     if ExistingInstallation then
-      Lifecycle(ExpandConstant('{tmp}\lifecycle.ps1'), 'Resume')
-    else if FileExists(ExpandConstant('{commonappdata}\UacApproval\installation.json')) then
-      Lifecycle(ExpandConstant('{tmp}\lifecycle.ps1'), 'Uninstall');
+      Lifecycle(ExpandConstant('{tmp}\lifecycle.ps1'), 'Resume');
   end;
 end;
 
