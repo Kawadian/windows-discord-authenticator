@@ -172,7 +172,7 @@ class ApprovalBot(discord.Client):
                             self.config.request_lifetime_seconds)
         content = (f"<@{self.config.owner_id}> 🔐 管理者承認申請\n"
                    f"PC: `{request.computer}` / ユーザー: `{request.user}`\n"
-                   f"検知: `{request.trigger}` / 画面時刻: `{request.captured_at}`\n"
+                   f"検知: `{request.trigger}` / 情報取得時刻: `{request.captured_at}`\n"
                    f"直前のウィンドウ: `{request.window}`\n"
                    f"直前のプロセス: `{request.process}`\n"
                    "この情報は UAC の実行対象を証明するものではありません。")

@@ -1,6 +1,12 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 param([switch] $RemoveAccount)
 $ErrorActionPreference = 'Stop'
+$uninstaller = Join-Path $env:ProgramFiles 'UacApproval\unins000.exe'
+if (Test-Path $uninstaller) {
+    $process = Start-Process -FilePath $uninstaller -Wait -PassThru
+    if ($process.ExitCode -ne 0) { throw 'アンインストールできませんでした。' }
+    return
+}
 & sc.exe stop UacApprovalService 2>$null | Out-Null
 Start-Sleep -Seconds 3
 & sc.exe delete UacApprovalService 2>$null | Out-Null

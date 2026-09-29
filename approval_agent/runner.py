@@ -5,7 +5,7 @@ import logging
 import threading
 
 from .account import set_local_password
-from .config import Config
+from .config import Config, DATA_DIR
 from .discord_ui import ApprovalBot
 from .lease import LeaseStore
 from .requests_server import RequestServer
@@ -14,6 +14,11 @@ log = logging.getLogger(__name__)
 
 
 async def run(stop: threading.Event) -> None:
+    # A fresh installation can run before the administrator enters credentials.
+    while not (DATA_DIR / 'config.json').exists():
+        if stop.is_set():
+            return
+        await asyncio.sleep(.5)
     config = Config.load()
     store = LeaseStore(lambda value: set_local_password(config.admin_account, value))
     # Any password from a prior Service lifetime is revoked before listening.

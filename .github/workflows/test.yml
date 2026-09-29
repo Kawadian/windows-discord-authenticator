@@ -24,7 +24,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Get-ChildItem scripts -Filter '*.ps1' | ForEach-Object {
+          Get-ChildItem scripts, packaging -Filter '*.ps1' | ForEach-Object {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null

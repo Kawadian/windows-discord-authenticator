@@ -1,8 +1,9 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 param(
     [ValidatePattern('^[A-Za-z0-9._/-]+$')]
     [string] $Ref = 'main',
     [string] $SourcePath,
+    [string] $InstallerPath,
     [switch] $CheckOnly,
     [switch] $Force
 )
@@ -10,6 +11,16 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = 'Kawadian/windows-discord-authenticator'
 $program = Join-Path $env:ProgramFiles 'UacApproval'
+if ($InstallerPath) {
+    $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
+    if ([IO.Path]::GetExtension($installer) -ne '.exe') { throw 'EXE インストーラーを指定してください。' }
+    $process = Start-Process -FilePath $installer -Wait -PassThru
+    if ($process.ExitCode -notin @(0, 3010)) { throw "インストーラーが失敗しました: $($process.ExitCode)" }
+    return
+}
+if (Test-Path (Join-Path $program 'UacApproval.exe')) {
+    throw 'EXE 版は新しいインストーラーを再実行して更新してください。-InstallerPath でも指定できます。'
+}
 $code = Join-Path $program 'source'
 $data = Join-Path $env:ProgramData 'UacApproval'
 $marker = Join-Path $data 'installed-version.json'

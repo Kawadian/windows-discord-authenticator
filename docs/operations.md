@@ -1,55 +1,56 @@
-# 運用・検証
+# 運用・移行・検証
 
-## Discord の準備
+## ビルド
 
-Developer Portal で Bot を作成し、Bot Token を取得します。専用のプライベートチャンネルには本人と Bot だけがアクセスできるようにします。Bot に `View Channel`、`Send Messages`、`Attach Files`、`Read Message History` を付与します。Bot の Gateway Intent は最低限で足り、Message Content Intent は使用しません。
+GitHub Actions の `Build Windows installer` を手動実行します。成果物は `UacApproval-Windows-x64` です。Secrets や Bot token を Actions に登録する必要はありません。ローカルでビルドする場合は Windows x64、Python 3.12、Inno Setup 6 を用意し、`packaging/build.ps1` を実行します。
 
-申請メッセージの画像・ウィンドウ名は Discord 側に残ります。不要になった申請は手動で削除してください。一時パスワードはチャンネル本文には残さず、承認者だけへの ephemeral 応答に表示します。Discord の表示を持つ本人のアカウントは二要素認証を有効にしてください。
+インストーラーは管理者として実行されます。標準ユーザーの権限だけではインストールできません。初回設定はアプリの認証設定ボタンから行います。インストーラーの完了画面で認証設定を選ぶこともできます。
 
-## Windows 実機での確認
+## 設定と権限
 
-1. `Get-Service UacApprovalService` が Running、`Get-ScheduledTask UacApprovalWatchdog*` が登録済み、`Get-LocalUser UacApproval` が Enabled であることを確認します。
-2. 親の標準ユーザーでサインインして `Ctrl + Alt + F12` を押し、本人の Discord にスクリーンショットが届くことを確認します。
-3. 有効時間を 30 秒にして発行し、UAC に `.\UacApproval` と表示されたパスワードを入力します。期限後に同じパスワードで二度目の UAC が通らないことを確認します。
-4. Service を停止して有効時間を超え、定期タスクが失効させることを確認します。停止テストの前には、PC にアクセスできる別の管理者アカウントを用意してください。
-5. 通常デスクトップで突然 UAC が出るケースを複数回試し、直前画面が送られる頻度・PC の負荷を確認します。検出できない環境では `Ctrl + Alt + F12` を使います。
+- `%ProgramFiles%\UacApproval`: EXE と同梱ランタイム。SYSTEM と Administrators が書き込み、Users は読み取り・実行のみ。
+- `%ProgramData%\UacApproval\config.json`: Bot token、チャンネル ID、承認者 ID。SYSTEM と Administrators のみアクセス可能。GUI は認証情報をコマンドラインや HTTP で渡しません。
+- `%ProgramData%\UacApproval\installation.json`: アカウントの SID、自動起動設定の元の値など、削除・復元のための管理者専用記録。更新で上書きしません。
+- `%ProgramData%\UacApproval\tray.json`: 機密情報を含まない接続ポート・撮影間隔。
+- `%LocalAppData%\UacApproval\privacy.json`: 各 Windows ユーザーのプライバシー設定。未作成・壊れている場合はすべて OFF。
 
-自動撮影はプライマリモニターのみを対象にし、DXGI が新しいフレームを返したときだけ最新画面を更新します。ホットキーによる撮影は全モニターをその場で取得します。実機ではタスクマネージャーで CPU とメモリ使用量を確認し、負荷が気になる場合は `capture_interval_ms` を 1000～2000 に調整してください。
+Bot token などは画面の認証設定から変更します。保存後の Service 起動成功は Discord 認証成功を意味しません。通常の設定画面で申請し、Discord に届くことを確認してください。無効な token の場合は再度認証設定を開いて修正します。通常ユーザーは自分の共有設定を変えられますが、承認者を変更するには管理者承認が必要です。
 
-## 設定変更と更新
+撮影間隔は現在 `config.json` / `tray.json` の `capture_interval_ms`（200～5000 ms、既定750）で設定します。手動変更する場合は両方をそろえて Service と画面を再起動します。撮影・情報共有・自動検知の ON/OFF は GUI から即時反映します。
 
-`%ProgramData%\UacApproval\config.json` は管理者と SYSTEM のみ読み書きできます。Token や ID の変更後は Service を再起動します。撮影間隔とポートを変える場合は `tray.json` の値もそろえて、親ユーザーのセッションを再ログオンします。interval は 200～5000 ms です。再起動は有効中のパスワードを失効させます。
+## 撮影停止の保証範囲
 
-### 更新スクリプト
+撮影、画像の保持、申請ペイロードの生成・送信は同じ同期境界で直列化します。撮影 OFF の反映完了までに進行中の撮影・送信を待ち、画像の close と DXGI カメラの release を行います。それ以降、撮影関数を呼ぶ経路はなく、ホットキーも画像なしになります。待機キューは申請理由のみ保持し、画像・個人情報を保持しません。OFF 後の待機申請には新しい設定を適用します。
 
-インストール済みPCで、新しいリポジトリの `scripts/update.ps1` を管理者 PowerShell から実行します。
+既に通信に渡したデータは取り消せません。Discord の過去メッセージは手動で削除してください。また、画面にある OFF スイッチを押した瞬間から進行中の OS 呼び出しを強制中断するわけではありません。画面に「変更中」と表示した後、「OFF・保持画像破棄済み」になることを確認してください。Windows API 自体が応答しない場合は完了を偽って表示しません。
 
-```powershell
-# main の最新コミットを確認するだけ
-powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -CheckOnly
+画像はプライマリモニターのみです。Secure Desktop のキャプチャは行いません。DXGI が新フレームを返さない間は画像・情報取得時刻が古くなる場合があります。OFF の情報は収集関数でも取得を避け、送信直前にも非共有に置き換えます。自動検知 ON は `consent.exe` の存在確認を必要としますが、列挙したプロセス一覧を送信しません。
 
-# main の最新コミットを適用
-powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1
+## 旧スクリプト版からの移行
 
-# タグまたはコミットを指定
-powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -Ref v1.2.3
+EXE インストーラーは、旧構成の `source\pyproject.toml`、認証設定、Service、専用アカウントの説明文を確認して移行します。認証設定とアカウントは保持し、Service と watchdog を同梱 EXE へ切り替えます。旧 Python の画面プロセスも停止します。新しいプライバシー設定は初期状態 OFF です。
 
-# 手元のチェックアウトを適用（同じ版でも再インストール）
-powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -SourcePath C:\path\to\checkout
-```
+旧インストーラーは元の自動起動値を記録していなかったため、**旧版導入前の値を遡って復元することはできません**。移行後のアンインストールでは旧版の自動起動も削除します。本アプリは旧版も新版も UAC 設定を自動変更しません。ユーザーが手動で変えた Windows 設定は自動で戻しません。
 
-GitHub のコミット SHA を特定し、保護された `%ProgramFiles%\UacApproval` 内にソースを展開します。Service の実行ファイルと同じ場所の Python を使用するため、別の Python を後から追加しても導入先が変わりません。更新用と復旧用の wheel をService稼働中に用意した後、Serviceを正常停止して既存パスワードを失効させ、パッケージとソースを更新します。新Serviceが起動しなければ旧パッケージと旧ソースを復元します。旧ソースは `source.backup-日時-ID` として保持されます。
+旧版がグローバル Python に入れたパッケージは、他の用途との共有を判定できないため自動削除しません。移行後に不要であれば、旧 Python 環境から `pip uninstall uac-approval-discord` を実行してください。同梱 EXE はその環境に依存しません。
 
-`%ProgramData%\UacApproval` 内の Bot Token、PC設定、期限記録、および専用管理者アカウントは更新対象に含めません。Service再起動で発行済み一時パスワードは失効します。標準ユーザー側の Tray は再ログオンで新コードを読み込みます。依存ライブラリの変更を伴う更新が途中で失敗した場合、旧パッケージは復元されますが、全ユーザー向けPythonに追加・更新された依存ライブラリは残る場合があります。
+旧スクリプト版をそのまま運用する場合は従来の `scripts/update.ps1` の `-Ref`、`-SourcePath`、`-CheckOnly` が使えます。EXE 版への移行後はインストーラーの再実行、または `-InstallerPath` を使用します。EXE の構成へソース用の pip 更新を混在させないよう、更新スクリプトはその操作を拒否します。
 
-更新中はSYSTEMで動くwatchdogタスクを止めません。ソースの取得とwheel作成に失敗した場合はServiceを止めずに終了します。
+## 完全アンインストール
 
-## 期限と障害
+アプリのボタン、スタートメニュー、Windows のインストール済みアプリから実行します。専用アカウントで実行中の作業を終え、別の管理者の資格情報で承認してください。
 
-Service は起動時と正常停止時に専用管理者アカウントのパスワードをローテーションします。発行時に期限だけを保護された `state.json` に保存し、Service が 0.5 秒間隔、独立した SYSTEM タスクが毎分期限を検査します。タスクの毎分実行には最大約 1 分の遅れがあります。Windows 自体が停止している間の失効は、次の起動時まで実行できません。
+削除処理は Service と画面、watchdog を停止し、Service・タスク・専用アカウントを削除します。アカウントの SID が記録と異なる場合は、別アカウントを誤って消さないよう停止します。自動起動の値は、新規 EXE 導入前に存在した値へ復元します。後から値が他のものへ変更されていれば維持します。
 
-Discord が接続できないときは新しい申請の受付を停止します。すでに発行済みのパスワードの期限は、Discord 接続の有無に左右されません。サービスとタスクの両方が停止すると期限失効は保証されません。
+認証情報・期限記録・インストール記録、全ローカルプロファイル内の本アプリのプライバシー設定、EXE と同梱ランタイム、ショートカットを削除します。プロファイルのリンク／ジャンクションは辿りません。そのような特殊配置や、後から追加された未知のファイルは自動削除の対象外です。Discord の投稿、ダウンロード済みの EXE、利用者が配置した Git チェックアウトは削除しません。
 
-## アンインストール
+## Windows 実機での受け入れ確認
 
-管理者 PowerShell から `powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1` を実行します。専用管理者アカウントも削除する場合は `-RemoveAccount` を付けます。別の管理者でログインできることを確認してから実行してください。Token を含む `%ProgramData%\UacApproval` とプログラムは、内容を確認してから手動で削除します。全ユーザー向けPythonのパッケージは他の用途への影響を確認してから削除してください。
+1. インストール → 認証設定 → 画像なし申請 → Discord への到着を確認します。
+2. 撮影と必要な情報を ON にし、ウィンドウを変えながら申請して内容を確認します。
+3. 撮影を OFF にして反映完了を待ち、手動・自動のどちらでも画像が送られないことを確認します。情報スイッチも個別に確認します。API を呼ばない性質は自動テストでも検証しています。
+4. 有効時間30秒で発行し、`.\UacApproval` で UAC を承認します。期限後の再利用ができないことを確認します。既存の昇格済みプロセスは終了しません。
+5. 認証設定の変更が反映されること、自動検知、通知領域、ログオン時起動、複数モニター／ロック復帰時の動作を確認します。
+6. インストーラーの再実行で設定が維持され、アンインストール後に登録物が残らないことを確認します。
+
+Service は通常0.5秒ごと、独立 watchdog は毎分期限を確認します。Service と watchdog の両方が停止した場合や Windows 停止中はローテーションできません。障害テストは必ず別の管理者で復旧可能な状態で行ってください。

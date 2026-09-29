@@ -8,3 +8,5 @@ build/
 config.json
 state.json
 *.log
+
+*.spec
