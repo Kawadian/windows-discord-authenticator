@@ -22,7 +22,7 @@ jobs:
         run: python -c "import approval_agent.tray, approval_agent.service, approval_agent.runner"
       - name: Local administrator account compatibility
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: powershell
         run: |
           $bytes = New-Object byte[] 24
           [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
