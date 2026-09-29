@@ -89,7 +89,7 @@ if ($Mode -eq 'Install') {
         SaveManifest
     }
     if (-not $manifest.accountSid) {
-        $bytes = New-Object byte[] 48
+        $bytes = New-Object byte[] 24
         $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
         try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
         $password = ConvertTo-SecureString ('Aa1!' + [Convert]::ToBase64String($bytes)) -AsPlainText -Force
