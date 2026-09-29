@@ -1,6 +1,10 @@
 ﻿#Requires -RunAsAdministrator
-param([ValidateSet('Prepare', 'Install', 'Uninstall')][string] $Mode)
+param([ValidateSet('Prepare', 'Install', 'Uninstall', 'Resume')][string] $Mode)
 $ErrorActionPreference = 'Stop'
+trap {
+    [Console]::Error.WriteLine(('Provisioning failed at line {0}: {1}' -f $_.InvocationInfo.ScriptLineNumber, $_.Exception.GetType().Name))
+    exit 1
+}
 $program = Join-Path $env:ProgramFiles 'UacApproval'
 $data = Join-Path $env:ProgramData 'UacApproval'
 $manifestPath = Join-Path $data 'installation.json'
@@ -33,9 +37,8 @@ function StopComponents {
         $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(40))
     }
     Get-CimInstance Win32_Process | Where-Object {
-        ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($program + '\', [StringComparison]::OrdinalIgnoreCase) -and
-         $_.Name -in @('UacApproval.exe', 'UacApprovalService.exe')) -or
-        ($_.Name -in @('python.exe', 'pythonw.exe') -and $_.CommandLine -match '-m approval_agent\.(tray|watchdog)(\s|$)')
+        $_.ExecutablePath -and $_.ExecutablePath.StartsWith($program + '\', [StringComparison]::OrdinalIgnoreCase) -and
+         $_.Name -in @('UacApproval.exe', 'UacApprovalService.exe')
     } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 # Reject junctions at the privileged storage roots.
@@ -47,20 +50,24 @@ foreach ($path in @($program, $data)) {
 $manifest = if (Test-Path $manifestPath) { Get-Content $manifestPath -Raw | ConvertFrom-Json } else { $null }
 $existingAccount = Get-LocalUser -Name $accountName -ErrorAction SilentlyContinue
 $existingService = Get-Service $serviceName -ErrorAction SilentlyContinue
-$legacy = $false
-if (-not $manifest -and (Test-Path (Join-Path $data 'config.json')) -and
-    (Test-Path (Join-Path $program 'source\pyproject.toml')) -and $existingAccount -and $existingService) {
-    $old = Get-Content (Join-Path $data 'config.json') -Raw | ConvertFrom-Json
-    $legacy = $old.admin_account -eq $accountName -and
-              $existingAccount.Description -eq 'Temporary administrator credentials for UAC approval'
-}
-if ($Mode -ne 'Uninstall' -and -not $manifest -and -not $legacy) {
+if ($Mode -ne 'Uninstall' -and -not $manifest) {
     if ($existingAccount -or $existingService -or (Test-Path (Join-Path $data 'config.json'))) {
-        throw 'An unrelated UacApproval account, service or configuration already exists. Resolve the name conflict first.'
+        throw 'UacApproval account, service or configuration already exists without an EXE installation record.'
     }
     foreach ($name in $tasks) {
         if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) { throw "Task already exists: $name" }
     }
+}
+if ($manifest -and $existingAccount -and $manifest.accountSid -ne $existingAccount.SID.Value) {
+    throw 'Dedicated account SID has changed; refusing to alter this installation.'
+}
+if ($Mode -eq 'Resume') {
+    foreach ($name in $tasks) {
+        $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+        if ($task) { Enable-ScheduledTask -InputObject $task | Out-Null }
+    }
+    if ($existingService) { Start-Service $serviceName }
+    exit 0
 }
 if ($Mode -eq 'Prepare') {
     StopComponents
@@ -75,12 +82,9 @@ if ($Mode -eq 'Install') {
         $key = Get-Item $runKey
         $oldRun = $key.GetValue('UacApprovalTray', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
         $kind = if ($null -ne $oldRun) { $key.GetValueKind('UacApprovalTray').ToString() } else { 'String' }
-        # A legacy project autorun is replaced, not restored to a removed Python client.
-        if ($legacy) { $oldRun = $null }
         $manifest = [pscustomobject]@{
-            schema = 1; accountSid = if ($legacy) { $existingAccount.SID.Value } else { $null }
+            schema = 1; accountSid = $null
             runExisted = $null -ne $oldRun; runValue = $oldRun; runKind = $kind
-            legacyMigrated = $legacy
         }
         SaveManifest
     }
@@ -162,11 +166,4 @@ if ($Mode -eq 'Uninstall') {
         }
     }
     Remove-Item -LiteralPath $data -Recurse -Force
-    # Legacy source/backups were installer-owned, not the user's git checkout.
-    $legacyFiles = @('source', 'backups', 'installed-version.json')
-    $legacyFiles += @(Get-ChildItem -LiteralPath $program -Directory | Where-Object { $_.Name -like 'source.backup-*' -or $_.Name -like 'update-*' } | Select-Object -ExpandProperty Name)
-    foreach ($name in $legacyFiles) {
-        $oldPath = Join-Path $program $name
-        if (Test-Path -LiteralPath $oldPath) { Remove-Item -LiteralPath $oldPath -Recurse -Force }
-    }
 }

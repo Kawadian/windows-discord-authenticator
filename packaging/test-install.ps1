@@ -25,6 +25,13 @@ try {
     foreach ($name in @('UacApprovalWatchdog', 'UacApprovalWatchdogAtStartup')) {
         if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) { throw 'Watchdog remained' }
     }
+} catch {
+    Get-Content setup-test.log -ErrorAction SilentlyContinue | Select-Object -Last 100
+    Get-Content uninstall-test.log -ErrorAction SilentlyContinue | Select-Object -Last 60
+    Get-ChildItem $program, $data -ErrorAction SilentlyContinue
+    # This disposable runner has no credentials; show provisioning errors directly.
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/lifecycle.ps1 -Mode Install
+    throw
 } finally {
     Remove-ItemProperty $runKey UacApprovalTray -ErrorAction SilentlyContinue
 }
