@@ -28,7 +28,9 @@ jobs:
           $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
           try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
           try {
-            $secret = ConvertTo-SecureString -String ('Aa1!' + [Convert]::ToBase64String($bytes)) -AsPlainText -Force
+            $secret = [Security.SecureString]::new()
+            foreach ($character in ('Aa1!' + [Convert]::ToBase64String($bytes)).ToCharArray()) { $secret.AppendChar($character) }
+            $secret.MakeReadOnly()
             $account = New-LocalUser -Name UacApprovalProbe -Password $secret -PasswordNeverExpires -Description 'UAC Approval temporary admin'
             if (-not $account.SID) { throw 'No SID returned' }
           } catch {
