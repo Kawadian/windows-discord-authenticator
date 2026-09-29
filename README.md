@@ -33,6 +33,16 @@
 
 設定ファイルは `%ProgramData%\UacApproval\config.json` に保存され、SYSTEM と Administrators だけが読める ACL にします。Bot Token は Git に入れず、漏えい時は Discord で再発行してください。アンインストール手順は [docs/operations.md](docs/operations.md) を参照してください。
 
+## アップデート
+
+新しいコードが公開されたら、管理者 PowerShell でリポジトリから次を実行します。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1
+```
+
+既定では GitHub の `main` の最新コミットを取得します。`-CheckOnly` で更新先を確認でき、`-Ref v1.2.3` のようにタグやコミットを指定できます。ローカルで編集したコードを入れる場合は `-SourcePath C:\path\to\checkout` を指定します。設定、Bot Token、専用アカウント、期限記録は維持されます。Service は再起動され、その時点で有効な一時パスワードは失効します。Tray の新コードは親ユーザーが再ログオンすると反映されます。詳しくは [更新手順](docs/operations.md#更新スクリプト) を参照してください。
+
 ## 開発と確認
 
 依存パッケージの導入後に `python -m unittest discover -s tests`。Windows 固有機能の統合検証には実機が必要です。詳細は [docs/operations.md](docs/operations.md)。

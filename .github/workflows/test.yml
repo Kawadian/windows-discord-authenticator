@@ -20,3 +20,13 @@ jobs:
       - name: Windows import smoke test
         if: runner.os == 'Windows'
         run: python -c "import approval_agent.tray, approval_agent.service, approval_agent.runner"
+      - name: PowerShell script syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem scripts -Filter '*.ps1' | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { throw "Invalid PowerShell syntax in $($_.Name): $($errors -join '; ')" }
+          }

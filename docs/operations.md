@@ -20,7 +20,29 @@ Developer Portal で Bot を作成し、Bot Token を取得します。専用の
 
 `%ProgramData%\UacApproval\config.json` は管理者と SYSTEM のみ読み書きできます。Token や ID の変更後は Service を再起動します。撮影間隔とポートを変える場合は `tray.json` の値もそろえて、親ユーザーのセッションを再ログオンします。interval は 200～5000 ms です。再起動は有効中のパスワードを失効させます。
 
-コード更新では管理者として Service を停止し、保護された `%ProgramFiles%\UacApproval\source` を新しいファイルで置き換え、全ユーザー向けの `python.exe -m pip install --no-user <source のパス>` を実行して Service を開始します。動いている標準ユーザー側の Tray は再ログオンして更新します。ユーザー書き込み可能なディレクトリから SYSTEM 権限で新しいコードを実行しないでください。
+### 更新スクリプト
+
+インストール済みPCで、新しいリポジトリの `scripts/update.ps1` を管理者 PowerShell から実行します。
+
+```powershell
+# main の最新コミットを確認するだけ
+powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -CheckOnly
+
+# main の最新コミットを適用
+powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1
+
+# タグまたはコミットを指定
+powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -Ref v1.2.3
+
+# 手元のチェックアウトを適用（同じ版でも再インストール）
+powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -SourcePath C:\path\to\checkout
+```
+
+GitHub のコミット SHA を特定し、保護された `%ProgramFiles%\UacApproval` 内にソースを展開します。更新用と復旧用の wheel をService稼働中に用意した後、Serviceを正常停止して既存パスワードを失効させ、パッケージとソースを更新します。新Serviceが起動しなければ旧パッケージと旧ソースを復元します。旧ソースは `source.backup-日時` として保持されます。
+
+`%ProgramData%\UacApproval` 内の Bot Token、PC設定、期限記録、および専用管理者アカウントは更新対象に含めません。Service再起動で発行済み一時パスワードは失効します。標準ユーザー側の Tray は再ログオンで新コードを読み込みます。依存ライブラリの変更を伴う更新が途中で失敗した場合、旧パッケージは復元されますが、全ユーザー向けPythonに追加・更新された依存ライブラリは残る場合があります。
+
+更新中はSYSTEMで動くwatchdogタスクを止めません。ソースの取得とwheel作成に失敗した場合はServiceを止めずに終了します。
 
 ## 期限と障害
 
