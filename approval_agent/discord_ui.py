@@ -47,7 +47,8 @@ class CustomTtl(discord.ui.Modal, title="パスワードの有効時間"):
             await interaction.response.send_message("1～30 分を入力してください。", ephemeral=True)
             return
         self.approval_view.ttl_seconds = minutes * 60
-        await interaction.response.send_message(f"有効時間を {minutes} 分に設定しました。発行ボタンを押してください。", ephemeral=True)
+        await interaction.response.send_message(f"有効時間を {minutes} 分に設定しました。発行ボタンを押してください。",
+                                                ephemeral=not self.approval_view.ttl_change_public)
 
 
 class TtlSelect(discord.ui.Select):
@@ -68,18 +69,23 @@ class TtlSelect(discord.ui.Select):
             return
         view.ttl_seconds = int(self.values[0])
         await interaction.response.send_message(
-            f"有効時間を {view.ttl_seconds} 秒に設定しました。発行ボタンを押してください。", ephemeral=True)
+            f"有効時間を {view.ttl_seconds} 秒に設定しました。発行ボタンを押してください。",
+            ephemeral=not view.ttl_change_public)
 
 
 class ApprovalView(discord.ui.View):
     def __init__(self, owner_id: int, account: str, request: ApprovalRequest,
-                 store: LeaseStore, request_lifetime: int):
+                 store: LeaseStore, request_lifetime: int, *, ttl_change_public: bool = False,
+                 password_public: bool = False, expiry_public: bool = False):
         super().__init__(timeout=request_lifetime)
         self.owner_id = owner_id
         self.account = account
         self.request = request
         self.store = store
         self.ttl_seconds = 60
+        self.ttl_change_public = ttl_change_public
+        self.password_public = password_public
+        self.expiry_public = expiry_public
         self.completed = False
         self.message: discord.Message | None = None
         self.add_item(TtlSelect())
@@ -95,22 +101,34 @@ class ApprovalView(discord.ui.View):
         if self.completed or time.time() > self.request.created_at + (self.timeout or 0):
             await interaction.response.send_message("この申請は失効しています。", ephemeral=True)
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        # A component update defer has no original response with a fixed visibility.
+        # Each followup can therefore choose its own visibility independently.
+        await interaction.response.defer()
         try:
             secret, expires_at = await asyncio.to_thread(self.store.issue, self.ttl_seconds)
         except Exception:
             await interaction.followup.send("発行できませんでした。すでに有効なパスワードがないか、Service の状態を確認してください。", ephemeral=True)
             return
+        sent = []
         try:
-            await interaction.followup.send(
+            sent.append(await interaction.followup.send(
                 f"**{self.request.computer}** の一時パスワード\n"
-                f"アカウント: `.\\{self.account}`\n"
-                f"**`{secret}`**\n有効期限: <t:{int(expires_at)}:F> (<t:{int(expires_at)}:R>)",
-                ephemeral=True,
-            )
+                f"アカウント: `.\\{self.account}`\n**`{secret}`**",
+                ephemeral=not self.password_public, wait=True,
+            ))
+            sent.append(await interaction.followup.send(
+                f"**{self.request.computer}** のパスワード有効期限: "
+                f"<t:{int(expires_at)}:F> (<t:{int(expires_at)}:R>)",
+                ephemeral=not self.expiry_public, wait=True,
+            ))
         except Exception:
             # If delivery fails, do not leave an undisclosed valid password behind.
             await asyncio.to_thread(self.store.rotate)
+            for message in sent:
+                try:
+                    await message.delete()
+                except discord.HTTPException:
+                    pass
             raise
         self.completed = True
         for item in self.children:
@@ -169,7 +187,10 @@ class ApprovalBot(discord.Client):
             jpeg=jpeg, created_at=time.time(),
         )
         view = ApprovalView(self.config.owner_id, self.config.admin_account, request, self.store,
-                            self.config.request_lifetime_seconds)
+                            self.config.request_lifetime_seconds,
+                            ttl_change_public=self.config.ttl_change_public,
+                            password_public=self.config.password_public,
+                            expiry_public=self.config.expiry_public)
         content = (f"<@{self.config.owner_id}> 🔐 管理者承認申請\n"
                    f"PC: `{request.computer}` / ユーザー: `{request.user}`\n"
                    f"検知: `{request.trigger}` / 情報取得時刻: `{request.captured_at}`\n"

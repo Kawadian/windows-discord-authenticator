@@ -9,12 +9,14 @@ GitHub Actions の `Build Windows installer` を手動実行します。成果�
 ## 設定と権限
 
 - `%ProgramFiles%\UacApproval`: EXE と同梱ランタイム。SYSTEM と Administrators が書き込み、Users は読み取り・実行のみ。
-- `%ProgramData%\UacApproval\config.json`: Bot token、チャンネル ID、承認者 ID。SYSTEM と Administrators のみアクセス可能。GUI は認証情報をコマンドラインや HTTP で渡しません。
+- `%ProgramData%\UacApproval\config.json`: Bot token、チャンネル ID、承認者 ID、パスワードの発行条件と Discord の表示範囲。SYSTEM と Administrators のみアクセス可能。GUI は認証情報をコマンドラインや HTTP で渡しません。
 - `%ProgramData%\UacApproval\installation.json`: アカウントの SID、自動起動設定の元の値など、削除・復元のための管理者専用記録。更新で上書きしません。
 - `%ProgramData%\UacApproval\tray.json`: 機密情報を含まない接続ポート・撮影間隔。
 - `%LocalAppData%\UacApproval\privacy.json`: 各 Windows ユーザーのプライバシー設定。未作成・壊れている場合はすべて OFF。
 
 Bot token などは画面の認証設定から変更します。保存後の Service 起動成功は Discord 認証成功を意味しません。通常の設定画面で申請し、Discord に届くことを確認してください。無効な token の場合は再度認証設定を開いて修正します。通常ユーザーは自分の共有設定を変えられますが、承認者を変更するには管理者承認が必要です。
+
+管理者向け画面でパスワードの桁数と数字・英字・記号を指定し、有効時間の変更通知、パスワード、期限それぞれを承認者限定表示かチャンネル表示に切り替えられます。更新前の設定ファイルに新項目がなくても既定値を使います。Windows のローカルパスワードポリシーと合わない場合は発行が失敗するため、文字種と長さを調整してください。
 
 撮影間隔は現在 `config.json` / `tray.json` の `capture_interval_ms`（200～5000 ms、既定750）で設定します。手動変更する場合は両方をそろえて Service と画面を再起動します。撮影・情報共有・自動検知の ON/OFF は GUI から即時反映します。
 
@@ -28,7 +30,7 @@ Bot token などは画面の認証設定から変更します。保存後の Ser
 
 ## 更新
 
-GitHub Actions で新しい版のインストーラーを作り、同じ PC で再実行します。Service の停止と再開、発行済みパスワードの失効はインストーラーが行います。`scripts/update.ps1 -InstallerPath <EXE>` でも実行できます。
+GitHub Actions で `UacApproval-Setup-0.3.0-x64.exe` を作り、現在インストール済みの PC で **アンインストールせずにそのまま実行** します。管理者承認は必要です。Service の停止と再開、発行済みパスワードの失効はインストーラーが行い、Bot token・ID・専用アカウント・ユーザーのプライバシー設定は保持します。更新後、通常の設定画面を開き直して新しい管理者向け画面で発行条件と表示範囲を選んでください。新項目を未設定の場合は10桁の小文字英数字、表示範囲はすべて承認者限定です。`scripts/update.ps1 -InstallerPath <EXE>` でも実行できます。
 
 ## 完全アンインストール
 

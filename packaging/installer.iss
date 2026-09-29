@@ -1,4 +1,4 @@
-#define AppVersion "0.2.0"
+#define AppVersion "0.3.0"
 [Setup]
 AppId={{DAEE1E8D-2A88-4A25-AD5D-76B726B478CB}
 AppName=UAC Approval

@@ -19,6 +19,16 @@ try {
         if ($task.Actions[0].Execute -ne (Join-Path $program 'service\UacApprovalService.exe') -or
             $task.Actions[0].Arguments -ne '--watchdog' -or $task.Triggers.Count -ne 2) { throw 'Watchdog registration mismatch' }
     }
+    # Re-run the installer with credentials/settings from the currently installed release.
+    # The update must preserve the configuration byte-for-byte and keep the account SID.
+    $configPath = Join-Path $data 'config.json'
+    $existingConfig = '{"bot_token":"update-test","channel_id":123,"owner_id":456}'
+    [IO.File]::WriteAllText($configPath, $existingConfig)
+    $oldSid = (Get-LocalUser UacApproval).SID.Value
+    $p = Start-Process $setup -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=setup-update-test.log' -Wait -PassThru
+    if ($p.ExitCode -ne 0) { Get-Content setup-update-test.log | Select-Object -Last 55; throw "Update failed: $($p.ExitCode)" }
+    if ([IO.File]::ReadAllText($configPath) -cne $existingConfig) { throw 'Existing configuration was changed' }
+    if ((Get-LocalUser UacApproval).SID.Value -ne $oldSid) { throw 'Account was replaced during update' }
     $privacyFile = Join-Path $env:LOCALAPPDATA 'UacApproval\privacy.json'
     New-Item -ItemType Directory -Force (Split-Path $privacyFile) | Out-Null
     Set-Content -LiteralPath $privacyFile -Value '{"screenshots":false}'

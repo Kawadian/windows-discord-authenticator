@@ -7,7 +7,7 @@ Windows の UAC 承認を Discord に申請し、承認者が有効期限付き�
 1. GitHub の **Actions → Build Windows installer → Run workflow** を開きます。
 2. ブランチを選んで実行します。
 3. 成功した実行の **Artifacts → UacApproval-Windows-x64** をダウンロードして展開します。
-4. `UacApproval-Setup-0.2.0-x64.exe` を対象PCで実行します。
+4. `UacApproval-Setup-0.3.0-x64.exe` を対象PCで実行します。
 
 インストーラーは **Windows 10/11 x64・管理者権限** が必要です。Python 本体と依存パッケージを同梱するため、Python や PowerShell スクリプトを利用者が用意する必要はありません。専用管理者アカウント `UacApproval`、LocalSystem の Service、期限監視タスクを登録します。Windows の UAC 設定や実行ポリシーの永続設定は変更しません。
 
@@ -17,11 +17,15 @@ Windows の UAC 承認を Discord に申請し、承認者が有効期限付き�
 
 1. Discord Developer Portal で専用 Bot を作り、本人と Bot だけが閲覧できるチャンネルへ招待します。Bot には View Channel / Send Messages / Attach Files / Read Message History を付与します。Message Content Intent は不要です。Interaction Endpoint URL は設定しません。
 2. インストール後、スタートメニューから **UAC Approval** を開きます。
-3. **Bot token・チャンネル・承認者を変更** を押し、管理者承認後に Bot token、チャンネル ID、承認者のユーザー ID を入力して保存します。初回は未設定のまま Service が待機します。
+3. **認証・パスワード・Discord 表示範囲の設定** を押し、管理者承認後に Bot token、チャンネル ID、承認者のユーザー ID を入力して保存します。初回は未設定のまま Service が待機します。
 4. 必要なプライバシースイッチだけを ON にします。**初期状態では撮影・各情報の共有・自動申請はすべて OFF** です。
 5. **承認を申請する** または `Ctrl + Alt + F12` で試します。撮影 OFF でも画像なしの申請ができます。
 
 画面を閉じると通知領域に常駐します。アイコンから設定画面を再表示・終了できます。ログオン時にも自動起動します。Bot token は管理者専用の設定ファイルに保存され、通常ユーザーで動く画面側は読みません。認証情報の変更は Service の再起動を伴い、有効な一時パスワードを失効させます。
+
+管理者向け画面の **パスワード・表示範囲** タブで、発行するパスワードの桁数（8～64）、数字・英字・記号の有無、英字の大文字／小文字／両方を設定できます。既定は **10桁、数字と小文字の英字、記号なし** です。少なくとも1種類の文字を選び、選んだ種類は必ず1文字以上含まれます。Windows に別途パスワードの長さや複雑性ポリシーがある場合、設定した組み合わせによって発行が拒否されることがあります。
+
+同じタブで、Discord 上の **有効時間の変更通知**、**パスワード**、**パスワードの有効期限** の表示範囲を別々に切り替えられます。既定ではいずれもボタンを押した承認者だけに表示されます。「チャンネルに表示」を ON にした項目はそのチャンネルを閲覧できる全員に見えます。申請本体の投稿と「発行済み」の表示は従来どおりチャンネルに残ります。既に投稿したメッセージの表示範囲は後から変わりません。
 
 ## プライバシー
 
@@ -48,7 +52,7 @@ Windows の UAC 承認を Discord に申請し、承認者が有効期限付き�
 スクリプト経由で更新する場合も EXE を指定できます。
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -InstallerPath C:\Downloads\UacApproval-Setup-0.2.0-x64.exe
+powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -InstallerPath C:\Downloads\UacApproval-Setup-0.3.0-x64.exe
 ```
 
 アプリの **完全アンインストール**、または Windows の **インストールされているアプリ** から削除できます。Service・監視タスク・本ツールが作成した専用アカウント・認証設定・各ユーザーのプライバシー設定・同梱ランタイムを削除し、自動起動の登録値を元に戻します。後から別のプログラムに変更された登録値は上書きしません。Discord に投稿済みの内容と、ダウンロードしたインストーラー／自分の Git チェックアウトは削除しません。

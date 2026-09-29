@@ -126,7 +126,7 @@ def main():
         except OSError as exc:
             messagebox.showerror('アンインストール', str(exc))
 
-    ttk.Button(frame, text='Bot token・チャンネル・承認者を変更（管理者承認）', command=configure).pack(fill='x', pady=4)
+    ttk.Button(frame, text='認証・パスワード・Discord 表示範囲の設定（管理者承認）', command=configure).pack(fill='x', pady=4)
     ttk.Button(frame, text='完全アンインストール（管理者承認）', command=uninstall).pack(fill='x', pady=4)
     ttk.Label(frame, textvariable=status, wraplength=560).pack(anchor='w', pady=12)
     ttk.Label(frame, text='閉じると通知領域に常駐します。終了するにはアイコンのメニューを使ってください。',

@@ -20,7 +20,7 @@ async def run(stop: threading.Event) -> None:
             return
         await asyncio.sleep(.5)
     config = Config.load()
-    store = LeaseStore(lambda value: set_local_password(config.admin_account, value))
+    store = LeaseStore(lambda value: set_local_password(config.admin_account, value), config=config)
     # Any password from a prior Service lifetime is revoked before listening.
     await asyncio.to_thread(store.rotate)
     bot = ApprovalBot(config, store)

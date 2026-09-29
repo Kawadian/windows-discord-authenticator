@@ -12,21 +12,40 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterator
 
-from .config import DATA_DIR
+from .config import DATA_DIR, Config
 
-_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+LOWER = "abcdefghijkmnopqrstuvwxyz"
+UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+DIGITS = "23456789"
+SYMBOLS = "!@#%_-+="
 
 
-def password(length: int = 40) -> str:
-    if length < 12:
-        raise ValueError("password too short")
-    # A mixed-case letter and digit even with a restrictive local password policy.
-    chars = [secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ"),
-             secrets.choice("abcdefghijkmnopqrstuvwxyz"),
-             secrets.choice("23456789")]
-    chars.extend(secrets.choice(_ALPHABET) for _ in range(length - 3))
+def password(length: int = 10, *, digits: bool = True, letters: bool = True,
+             letter_case: str = "lower", symbols: bool = False) -> str:
+    if type(length) is not int or not 8 <= length <= 64 or letter_case not in ("lower", "upper", "both"):
+        raise ValueError("invalid password format")
+    pools = []
+    if digits:
+        pools.append(DIGITS)
+    if letters:
+        if letter_case in ("lower", "both"):
+            pools.append(LOWER)
+        if letter_case in ("upper", "both"):
+            pools.append(UPPER)
+    if symbols:
+        pools.append(SYMBOLS)
+    if not pools or length < len(pools):
+        raise ValueError("no password character sets selected")
+    chars = [secrets.choice(pool) for pool in pools]
+    alphabet = "".join(pools)
+    chars.extend(secrets.choice(alphabet) for _ in range(length - len(chars)))
     secrets.SystemRandom().shuffle(chars)
     return "".join(chars)
+
+
+def rotation_password() -> str:
+    # Rotation is independent of the display policy and remains hard to guess.
+    return password(40, digits=True, letters=True, letter_case="both", symbols=True)
 
 
 @contextlib.contextmanager
@@ -63,11 +82,12 @@ def file_lock(directory: Path) -> Iterator[None]:
 
 class LeaseStore:
     def __init__(self, set_password: Callable[[str], None], directory: Path = DATA_DIR,
-                 now: Callable[[], float] = time.time):
+                 now: Callable[[], float] = time.time, config: Config | None = None):
         self.set_password = set_password
         self.directory = directory
         self.now = now
         self.path = directory / "state.json"
+        self.config = config
 
     def _read(self) -> dict:
         if not self.path.exists():
@@ -96,7 +116,12 @@ class LeaseStore:
                 if state["expires_at"] > self.now():
                     raise RuntimeError("A password is already active")
                 self._rotate_locked()
-            secret = password(16)
+            options = self.config or Config("", 0, 0)
+            options.validate()
+            secret = password(options.password_length, digits=options.password_digits,
+                              letters=options.password_letters,
+                              letter_case=options.password_letter_case,
+                              symbols=options.password_symbols)
             expires_at = self.now() + seconds
             # Write first: if a crash happens during the account change, watchdog
             # still has the expiry deadline and can rotate it.
@@ -112,7 +137,7 @@ class LeaseStore:
             return secret, expires_at
 
     def _rotate_locked(self) -> None:
-        self.set_password(password())
+        self.set_password(rotation_password())
         self._write({"active": False, "expires_at": None})
 
     def rotate(self) -> None:
