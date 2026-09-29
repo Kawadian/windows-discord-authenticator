@@ -8,7 +8,7 @@ $setup = (Get-ChildItem dist/installer/*.exe | Select-Object -First 1).FullName
 try {
     foreach ($attempt in 1..2) {
         $p = Start-Process $setup -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=setup-test.log' -Wait -PassThru
-        if ($p.ExitCode -ne 0) { Get-Content setup-test.log | Select-String 'Provisioning failed|Lifecycle Install|Lifecycle Prepare'; throw "Install failed: $($p.ExitCode)" }
+        if ($p.ExitCode -ne 0) { Get-Content setup-test.log | Select-Object -Last 55; throw "Install failed: $($p.ExitCode)" }
         (Get-Service UacApprovalService).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
         Start-Sleep -Seconds 2
         if ((Get-Service UacApprovalService).Status -ne 'Running') { throw 'Frozen service did not stay running' }
