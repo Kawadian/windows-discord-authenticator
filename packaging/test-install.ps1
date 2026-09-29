@@ -15,6 +15,9 @@ try {
         $manifest = Get-Content "$data\installation.json" -Raw | ConvertFrom-Json
         if ($manifest.runValue -ne 'restore-me-test') { throw 'Original autorun not preserved across upgrade' }
         if ((Get-LocalUser UacApproval).SID.Value -ne $manifest.accountSid) { throw 'Account mismatch' }
+        $task = Get-ScheduledTask -TaskName UacApprovalWatchdog
+        if ($task.Actions[0].Execute -ne (Join-Path $program 'service\UacApprovalService.exe') -or
+            $task.Actions[0].Arguments -ne '--watchdog' -or $task.Triggers.Count -ne 2) { throw 'Watchdog registration mismatch' }
     }
     $privacyFile = Join-Path $env:LOCALAPPDATA 'UacApproval\privacy.json'
     New-Item -ItemType Directory -Force (Split-Path $privacyFile) | Out-Null
@@ -26,7 +29,7 @@ try {
     if (Test-Path $data) { throw 'Configuration remained' }
     if (Test-Path $privacyFile) { throw 'User privacy preferences remained' }
     if ((Get-ItemProperty $runKey).UacApprovalTray -ne 'restore-me-test') { throw 'Autorun not restored' }
-    foreach ($name in @('UacApprovalWatchdog', 'UacApprovalWatchdogAtStartup')) {
+    foreach ($name in @('UacApprovalWatchdog')) {
         if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) { throw 'Watchdog remained' }
     }
 } catch {

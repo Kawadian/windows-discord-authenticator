@@ -12,7 +12,7 @@ $manifestPath = Join-Path $data 'installation.json'
 $runKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run'
 $accountName = 'UacApproval'
 $serviceName = 'UacApprovalService'
-$tasks = @('UacApprovalWatchdog', 'UacApprovalWatchdogAtStartup')
+$tasks = @('UacApprovalWatchdog')
 
 function Native([string] $File, [string[]] $Arguments) {
     & $File @Arguments | Out-Null
@@ -113,9 +113,26 @@ if ($Mode -eq 'Install') {
         Native 'sc.exe' @('create', $serviceName, 'binPath=', ('"{0}"' -f $hostExe), 'start=', 'auto', 'DisplayName=', 'UAC Approval Discord Agent')
     }
     Native 'sc.exe' @('failure', $serviceName, 'reset=', '0', 'actions=', 'restart/60000/restart/60000/restart/60000')
-    $action = '"{0}" --watchdog' -f $hostExe
-    Native 'schtasks.exe' @('/Create', '/TN', $tasks[0], '/SC', 'MINUTE', '/MO', '1', '/RU', 'SYSTEM', '/RL', 'HIGHEST', '/TR', $action, '/F')
-    Native 'schtasks.exe' @('/Create', '/TN', $tasks[1], '/SC', 'ONSTART', '/RU', 'SYSTEM', '/RL', 'HIGHEST', '/TR', $action, '/F')
+    # Register the executable and argument separately; paths under Program Files contain spaces.
+    # A missing duration means the 1-minute repetition continues indefinitely.
+    $scheduler = New-Object -ComObject Schedule.Service
+    $scheduler.Connect()
+    $folder = $scheduler.GetFolder('\')
+    $definition = $scheduler.NewTask(0)
+    $definition.RegistrationInfo.Description = 'Rotate expired UAC Approval credentials'
+    $definition.Principal.UserId = 'SYSTEM'
+    $definition.Principal.LogonType = 5 # TASK_LOGON_SERVICE_ACCOUNT
+    $definition.Principal.RunLevel = 1 # TASK_RUNLEVEL_HIGHEST
+    $definition.Settings.StartWhenAvailable = $true
+    $definition.Settings.ExecutionTimeLimit = 'PT2M'
+    $taskAction = $definition.Actions.Create(0) # TASK_ACTION_EXEC
+    $taskAction.Path = $hostExe
+    $taskAction.Arguments = '--watchdog'
+    $minute = $definition.Triggers.Create(1) # TASK_TRIGGER_TIME
+    $minute.StartBoundary = (Get-Date).AddMinutes(1).ToString('s')
+    $minute.Repetition.Interval = 'PT1M'
+    [void]$definition.Triggers.Create(8) # TASK_TRIGGER_BOOT
+    [void]$folder.RegisterTaskDefinition($tasks[0], $definition, 6, 'SYSTEM', $null, 5)
     [IO.File]::WriteAllText((Join-Path $data 'tray.json'), '{"port":53927,"capture_interval_ms":750}', [Text.UTF8Encoding]::new($false))
     $configPath = Join-Path $data 'config.json'
     if (Test-Path $configPath) {
