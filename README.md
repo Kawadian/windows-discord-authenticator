@@ -27,7 +27,7 @@
 ## セットアップ
 
 1. Discord Developer Portal で Bot を作成し、プライベートチャンネルに招待します。チャンネル ID と承認する本人のユーザー ID をコピーします。
-2. このリポジトリを親PCに配置します。管理者 PowerShell で `powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1` を実行します。スクリプトはローカルの `.venv` に依存パッケージを入れ、`UacApproval` アカウントを新規作成し、設定値を質問します。
+2. このリポジトリを親PCに配置します。管理者 PowerShell で `powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1` を実行します。スクリプトは全ユーザー向けPythonへ依存パッケージを導入し、`UacApproval` アカウントを新規作成して設定値を質問します。
 3. PC を再起動するか、親の標準ユーザーで再ログオンします。トレイ側は `HKLM\...\Run` により起動します。Service と `UacApprovalWatchdog` タスクの状態を確認します。
 4. `Ctrl + Alt + F12` で手動申請を試し、Discord に画面付きの申請が届くこと、TTL 選択→発行→UAC 入力→期限切れ後の再利用不可を確認します。
 

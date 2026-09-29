@@ -20,7 +20,7 @@ Developer Portal で Bot を作成し、Bot Token を取得します。専用の
 
 `%ProgramData%\UacApproval\config.json` は管理者と SYSTEM のみ読み書きできます。Token や ID の変更後は Service を再起動します。撮影間隔とポートを変える場合は `tray.json` の値もそろえて、親ユーザーのセッションを再ログオンします。interval は 200～5000 ms です。再起動は有効中のパスワードを失効させます。
 
-コード更新では管理者として Service を停止し、保護された `%ProgramFiles%\UacApproval\source` を新しいファイルで置き換え、仮想環境の `python.exe -m pip install <source のパス>` を実行して Service を開始します。動いている標準ユーザー側の Tray は再ログオンして更新します。ユーザー書き込み可能なディレクトリから SYSTEM 権限で新しいコードを実行しないでください。
+コード更新では管理者として Service を停止し、保護された `%ProgramFiles%\UacApproval\source` を新しいファイルで置き換え、全ユーザー向けの `python.exe -m pip install --no-user <source のパス>` を実行して Service を開始します。動いている標準ユーザー側の Tray は再ログオンして更新します。ユーザー書き込み可能なディレクトリから SYSTEM 権限で新しいコードを実行しないでください。
 
 ## 期限と障害
 
@@ -30,4 +30,4 @@ Discord が接続できないときは新しい申請の受付を停止します
 
 ## アンインストール
 
-管理者 PowerShell から `powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1` を実行します。専用管理者アカウントも削除する場合は `-RemoveAccount` を付けます。別の管理者でログインできることを確認してから実行してください。Token を含む `%ProgramData%\UacApproval` とプログラムは、内容を確認してから手動で削除します。
+管理者 PowerShell から `powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1` を実行します。専用管理者アカウントも削除する場合は `-RemoveAccount` を付けます。別の管理者でログインできることを確認してから実行してください。Token を含む `%ProgramData%\UacApproval` とプログラムは、内容を確認してから手動で削除します。全ユーザー向けPythonのパッケージは他の用途への影響を確認してから削除してください。

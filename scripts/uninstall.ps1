@@ -1,12 +1,9 @@
 #Requires -RunAsAdministrator
 param([switch] $RemoveAccount)
 $ErrorActionPreference = 'Stop'
-$program = Join-Path $env:ProgramFiles 'UacApproval'
-$python = Join-Path $program '.venv\Scripts\python.exe'
-if (Test-Path $python) {
-    & $python -m approval_agent.service stop 2>$null
-    & $python -m approval_agent.service remove 2>$null
-}
+& sc.exe stop UacApprovalService 2>$null | Out-Null
+Start-Sleep -Seconds 3
+& sc.exe delete UacApprovalService 2>$null | Out-Null
 & schtasks.exe /Delete /TN UacApprovalWatchdog /F 2>$null | Out-Null
 & schtasks.exe /Delete /TN UacApprovalWatchdogAtStartup /F 2>$null | Out-Null
 Remove-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -Name UacApprovalTray -ErrorAction SilentlyContinue

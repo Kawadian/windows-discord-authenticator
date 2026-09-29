@@ -6,17 +6,18 @@ $source = Split-Path -Parent $PSScriptRoot
 $program = Join-Path $env:ProgramFiles 'UacApproval'
 $code = Join-Path $program 'source'
 $data = Join-Path $env:ProgramData 'UacApproval'
-$venv = Join-Path $program '.venv'
-$python = Join-Path $venv 'Scripts\python.exe'
-$pythonw = Join-Path $venv 'Scripts\pythonw.exe'
 $configPath = Join-Path $data 'config.json'
 $account = 'UacApproval'
 
 if ((Test-Path $configPath) -or (Get-LocalUser -Name $account -ErrorAction SilentlyContinue)) {
     throw '既存の設定または UacApproval アカウントがあります。新規インストール専用です。更新は operations.md を参照してください。'
 }
-$basePython = (& py -3 -c 'import sys; print(sys.base_prefix)').Trim()
-if ($LASTEXITCODE -ne 0 -or $basePython.StartsWith($env:USERPROFILE, [StringComparison]::OrdinalIgnoreCase)) {
+$python = (& py -3 -c 'import sys; print(sys.executable)').Trim()
+$site = (& py -3 -c 'import sysconfig; print(sysconfig.get_path("purelib"))').Trim()
+$pythonw = Join-Path (Split-Path -Parent $python) 'pythonw.exe'
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $pythonw) -or
+    $python.StartsWith($env:USERPROFILE, [StringComparison]::OrdinalIgnoreCase) -or
+    $site.StartsWith($env:USERPROFILE, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'すべてのユーザーがアクセスできるマシン全体の Python をインストールしてください。ユーザープロファイル内の Python は SYSTEM の Service から使用できません。'
 }
 
@@ -31,7 +32,7 @@ if ([string]::IsNullOrWhiteSpace($token) -or $channelId -le 0 -or $ownerId -le 0
 }
 
 New-Item -ItemType Directory -Force -Path $program, $code, $data | Out-Null
-# Service が読むコードと venv を標準ユーザーが書き換えられないようにする。
+# Service が読むコードを標準ユーザーが書き換えられないようにする。
 & icacls.exe $program /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'コードディレクトリの ACL 設定に失敗しました。' }
 & icacls.exe $data /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
@@ -40,10 +41,10 @@ if ($LASTEXITCODE -ne 0) { throw '設定ディレクトリの ACL 設定に失�
 Copy-Item -Recurse -Force (Join-Path $source 'approval_agent') $code
 Copy-Item -Force (Join-Path $source 'pyproject.toml') $code
 Copy-Item -Force (Join-Path $source 'README.md') $code
-& py -3 -m venv $venv
-if ($LASTEXITCODE -ne 0) { throw 'Python 仮想環境の作成に失敗しました。' }
-& $python -m pip install --disable-pip-version-check $code
+& $python -m pip install --no-user --disable-pip-version-check $code
 if ($LASTEXITCODE -ne 0) { throw 'パッケージのインストールに失敗しました。' }
+& $python -m pywin32_postinstall -install
+if ($LASTEXITCODE -ne 0) { throw 'pywin32 のマシン全体セットアップに失敗しました。' }
 
 $config = @{
     bot_token = $token
