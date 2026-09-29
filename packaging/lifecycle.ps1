@@ -93,7 +93,7 @@ if ($Mode -eq 'Install') {
         $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
         try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
         $password = ConvertTo-SecureString ('Aa1!' + [Convert]::ToBase64String($bytes)) -AsPlainText -Force
-        $account = New-LocalUser -Name $accountName -Password $password -PasswordNeverExpires -Description 'Temporary administrator credentials for UAC approval'
+        $account = New-LocalUser -Name $accountName -Password $password -PasswordNeverExpires -Description 'UAC Approval temporary admin'
         $manifest.accountSid = $account.SID.Value
         SaveManifest
     }
