@@ -1,0 +1,39 @@
+name: Cleanup old Actions artifacts
+
+# Backstop: delete workflow artifacts older than 14 days so artifact
+# storage does not silently accumulate. Runs weekly and on demand.
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Delete artifacts older than 14 days
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "14 days ago" +%Y-%m-%dT%H:%M:%SZ)
+          echo "Deleting artifacts created before $cutoff"
+          gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | .id' > /tmp/all_ids.txt || true
+          deleted=0
+          while read -r id; do
+            [ -n "$id" ] || continue
+            created=$(gh api "repos/$REPO/actions/artifacts/$id" --jq .created_at || echo "")
+            if [ -n "$created" ] && [[ "$created" < "$cutoff" ]]; then
+              echo "Deleting artifact $id (created $created)"
+              gh api -X DELETE "repos/$REPO/actions/artifacts/$id" || true
+              deleted=$((deleted+1))
+            fi
+          done < /tmp/all_ids.txt
+          echo "Deleted $deleted artifact(s)."
